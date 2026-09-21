@@ -24,6 +24,7 @@ import type { AlertRow } from '@/data/mockAlerts'
 import { useRoleStore } from '@/stores/useRoleStore'
 
 import { filterByRole } from '@/lib/roleFilter'
+import { parseCsv } from '@/lib/parseCsv'
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL ?? 'http://127.0.0.1:5000'
 
@@ -45,6 +46,32 @@ type SortDir = 'asc' | 'desc' | 'none'
 
 type SeverityFilter = 'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'
 
+type UploadResultRow = {
+  work_id?: string | number
+  is_anomaly: boolean | null
+  risk_score: number | null
+  risk_level: string
+  error?: string
+  missing_fields?: string[]
+  details?: string
+  engineered_features?: Record<string, number>
+}
+
+type MergedRow = {
+  work_id: string
+  risk_score: number | null
+  risk_level: string
+  is_anomaly: boolean | null
+  error?: string
+  // Raw CSV fields — present only when the join succeeded
+  state?: string
+  work_category?: string
+  mp_name?: string
+  status?: string
+  cost_estimate?: string
+  payment_released_pct?: string
+}
+
 type UploadResponse = {
   status?: string
   filename?: string
@@ -53,7 +80,7 @@ type UploadResponse = {
   normal_records?: number
   invalid_records?: number
   error_records?: number
-  results?: unknown[]
+  results?: UploadResultRow[]
   error?: string
   details?: string
   missing?: string[]
@@ -175,6 +202,10 @@ export function Works() {
   const [uploadResult, setUploadResult] =
     useState<UploadResponse | null>(null)
 
+  const [mergedRows, setMergedRows] = useState<MergedRow[]>([])
+  const [uploadPage, setUploadPage] = useState(1)
+  const [uploadPageSize, setUploadPageSize] = useState(25)
+
   // -------------------------------------------------------------------------
   // Handle selected CSV file
   // -------------------------------------------------------------------------
@@ -248,6 +279,8 @@ export function Works() {
     setUploadMessage('')
     setUploadError('')
     setUploadResult(null)
+    setMergedRows([])
+    setUploadPage(1)
 
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
@@ -301,6 +334,42 @@ export function Works() {
       setUploadMessage(
         'CSV uploaded and analyzed successfully.'
       )
+
+      try {
+        const text = await selectedFile.text()
+        const rawRows = parseCsv(text)
+        const rawById = new Map(
+          rawRows.map((r) => [String(r.work_id ?? ''), r]),
+        )
+
+        const merged: MergedRow[] = (data.results ?? []).map((res) => {
+          const id = String(res.work_id ?? '')
+          const raw = rawById.get(id)
+          return {
+            work_id: id,
+            risk_score: res.risk_score ?? null,
+            risk_level: res.risk_level ?? 'Unknown',
+            is_anomaly: res.is_anomaly ?? null,
+            error: res.error,
+            ...(raw
+              ? {
+                  state: raw.state,
+                  work_category: raw.work_category,
+                  mp_name: raw.mp_name,
+                  status: raw.status,
+                  cost_estimate: raw.cost_estimate,
+                  payment_released_pct: raw.payment_released_pct,
+                }
+              : {}),
+          }
+        })
+
+        setMergedRows(merged)
+        setUploadPage(1)
+      } catch {
+        setMergedRows([])
+        setUploadPage(1)
+      }
     } catch (error) {
       console.error('CSV upload error:', error)
 
@@ -356,6 +425,10 @@ export function Works() {
 
   const [pageSize, setPageSize] =
     useState(50)
+
+  const uploadTotalPages = Math.max(1, Math.ceil(mergedRows.length / uploadPageSize))
+  const uploadStartIdx = (uploadPage - 1) * uploadPageSize
+  const uploadPagedRows = mergedRows.slice(uploadStartIdx, uploadStartIdx + uploadPageSize)
 
   // -------------------------------------------------------------------------
   // Reset page on filter/size/role change
@@ -735,6 +808,209 @@ export function Works() {
 
             </div>
           )}
+
+        {/* Upload results table */}
+        {uploadResult?.status === 'success' && mergedRows.length > 0 && (
+          <div className="mt-6">
+            <p className="text-sm font-black uppercase tracking-wider text-[#1A1A18] mb-3">
+              Analysis Results
+            </p>
+            <div className="border-2 border-[#1A1A18] bg-white overflow-x-auto mb-6">
+              <table className="w-full text-sm border-collapse min-w-[720px]">
+                <thead>
+                  <tr className="border-b-2 border-[#1A1A18] bg-[#F5F2E8]">
+                    {mergedRows[0]?.state !== undefined ? (
+                      <>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Work ID
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Category
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          State
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          MP
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Status
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Cost
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Paid %
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Risk
+                        </th>
+                      </>
+                    ) : (
+                      <>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Work ID
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Risk Score
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Risk Level
+                        </th>
+                        <th className="px-3 sm:px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-[#8A8680] whitespace-nowrap">
+                          Result
+                        </th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="divide-y-2 divide-[#1A1A18]">
+                  {uploadPagedRows.map((row, i) => {
+                    const hasRawFields = row.state !== undefined
+                    const riskStyle = RISK_BADGE[row.risk_level] ?? 'bg-white text-[#1A1A18] border border-[#1A1A18]'
+
+                    if (hasRawFields) {
+                      const statusStyle = STATUS_STYLES[row.status ?? ''] ?? 'bg-white text-[#1A1A18] border border-[#1A1A18]'
+                      const paidPct = row.payment_released_pct !== undefined ? (Number(row.payment_released_pct) * 100).toFixed(1) : ''
+
+                      return (
+                        <tr
+                          key={row.work_id || i}
+                          className="hover:bg-[#F5F2E8] transition-colors cursor-default"
+                        >
+                          <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                            <span className="font-mono text-xs font-medium text-[#1A1A18]">
+                              {row.work_id}
+                            </span>
+                          </td>
+                          <td
+                            className="px-3 sm:px-4 py-3 text-xs text-[#4A4845] max-w-[200px] truncate"
+                            title={row.work_category}
+                          >
+                            {row.work_category && row.work_category.length > 30
+                              ? `${row.work_category.slice(0, 30)}…`
+                              : row.work_category}
+                          </td>
+                          <td className="px-3 sm:px-4 py-3 text-xs text-[#4A4845] whitespace-nowrap">
+                            {row.state}
+                          </td>
+                          <td
+                            className="px-3 sm:px-4 py-3 text-xs text-[#4A4845] max-w-[160px] truncate"
+                            title={row.mp_name}
+                          >
+                            {row.mp_name
+                              ? row.mp_name.length > 24
+                                ? `${row.mp_name.slice(0, 24)}…`
+                                : row.mp_name
+                              : '—'}
+                          </td>
+                          <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 text-xs font-black uppercase tracking-wider ${statusStyle}`}
+                            >
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="px-3 sm:px-4 py-3 text-xs font-medium text-[#1A1A18] whitespace-nowrap">
+                            {formatCost(row.cost_estimate ?? '0')}
+                          </td>
+                          <td className="px-3 sm:px-4 py-3 text-xs font-medium text-[#4A4845] text-right whitespace-nowrap">
+                            {paidPct}%
+                          </td>
+                          <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                            <span
+                              className={`px-2 py-0.5 text-xs font-black uppercase tracking-wider ${riskStyle}`}
+                            >
+                              {row.risk_level.toUpperCase()}{' '}
+                              {row.risk_score !== null ? row.risk_score.toFixed(1) : ''}
+                            </span>
+                          </td>
+                        </tr>
+                      )
+                    }
+
+                    return (
+                      <tr
+                        key={row.work_id || i}
+                        className="hover:bg-[#F5F2E8] transition-colors cursor-default"
+                      >
+                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                          <span className="font-mono text-xs font-medium text-[#1A1A18]">
+                            {row.work_id}
+                          </span>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 text-xs text-[#4A4845] whitespace-nowrap">
+                          {row.risk_score !== null ? row.risk_score.toFixed(1) : '—'}
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-0.5 text-xs font-black uppercase tracking-wider ${riskStyle}`}
+                          >
+                            {row.risk_level.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-3 sm:px-4 py-3 text-xs text-[#4A4845] whitespace-nowrap">
+                          {row.is_anomaly === true
+                            ? 'Anomaly'
+                            : row.is_anomaly === false
+                            ? 'Normal'
+                            : row.error ?? '—'}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="mt-4 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <span className="text-xs font-medium uppercase tracking-wider text-[#8A8680]">
+                SHOWING {mergedRows.length === 0 ? 0 : uploadStartIdx + 1}–
+                {Math.min(uploadStartIdx + uploadPageSize, mergedRows.length)} OF {mergedRows.length} RESULTS
+              </span>
+
+              <div className="flex items-center gap-2 justify-between sm:justify-end">
+                <span className="text-xs uppercase tracking-wider text-[#8A8680]">
+                  ROWS:
+                </span>
+                <select
+                  value={uploadPageSize}
+                  onChange={(e) => {
+                    setUploadPageSize(Number(e.target.value))
+                    setUploadPage(1)
+                  }}
+                  className="bg-white border-2 border-[#1A1A18] rounded-none h-8 text-xs font-medium uppercase tracking-wider px-2 outline-none cursor-pointer text-[#1A1A18]"
+                >
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+
+                <button
+                  onClick={() => setUploadPage((p) => Math.max(1, p - 1))}
+                  disabled={uploadPage === 1}
+                  className="border-2 border-[#1A1A18] bg-white rounded-none h-8 px-3 ml-2 text-xs font-medium uppercase tracking-wider hover:bg-[#E8C018] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  ← PREV
+                </button>
+
+                <span className="text-xs font-medium uppercase tracking-wider text-[#1A1A18]">
+                  PAGE {uploadPage} OF {uploadTotalPages}
+                </span>
+
+                <button
+                  onClick={() =>
+                    setUploadPage((p) => Math.min(uploadTotalPages, p + 1))
+                  }
+                  disabled={uploadPage === uploadTotalPages}
+                  className="border-2 border-[#1A1A18] bg-white rounded-none h-8 px-3 text-xs font-medium uppercase tracking-wider hover:bg-[#E8C018] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  NEXT →
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
 
