@@ -5,7 +5,6 @@ import {
   HardHat,
   FileBarChart2,
   Settings,
-  Shield,
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
@@ -47,8 +46,12 @@ export function Sidebar() {
           ${sidebarCollapsed ? 'justify-center px-0' : 'px-4 gap-2'}
         `}
       >
-        <div className="flex items-center justify-center w-7 h-7 bg-[#1E3878] shrink-0">
-          <Shield className="w-4 h-4 text-[#F5F2E8]" strokeWidth={2.5} />
+        <div className="flex items-center justify-center w-7 h-7 bg-[#1E3878] shrink-0 overflow-hidden">
+          <img
+            src="/icons.svg"
+            alt="Chitragupta AI logo"
+            className="w-4 h-4 object-contain block"
+          />
         </div>
         {!sidebarCollapsed && (
           <span className="text-sm font-black uppercase tracking-tight text-[#1A1A18] whitespace-nowrap">

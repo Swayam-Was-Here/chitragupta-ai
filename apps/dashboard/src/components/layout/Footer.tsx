@@ -9,9 +9,11 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-2">
             <Link to="/" className="flex items-center gap-2.5 mb-4">
-              <div className="p-1.5 rounded-none bg-[#1E3878] border-2 border-[#1A1A18]">
-                <Shield className="w-5 h-5 text-[#F5F2E8]" />
-              </div>
+              <img
+                src="/icons.svg"
+                alt="Chitragupta AI logo"
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain block"
+              />
               <span className="text-[#1A1A18] font-semibold text-lg">
                 Chitragupta <span className="text-[#1E3878]">AI</span>
               </span>

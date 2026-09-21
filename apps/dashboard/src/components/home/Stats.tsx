@@ -27,7 +27,7 @@ const stats = [
     color: 'text-[#E8C018]',
   },
   {
-    value: 98.4,
+    value: 90,
     prefix: '',
     suffix: '%',
     label: 'Detection Accuracy',

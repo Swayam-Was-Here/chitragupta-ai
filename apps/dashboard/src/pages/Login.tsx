@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { Shield, Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react'
+import { Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -65,10 +65,12 @@ export function Login() {
         <Card className="bg-white border-2 border-[#1A1A18] rounded-none">
           <CardHeader className="text-center pb-6 pt-8">
             {/* Logo */}
-            <div className="flex justify-center mb-5">
-              <div className="relative p-4 rounded-none bg-[#1E3878] border-2 border-[#1A1A18]">
-                <Shield className="w-8 h-8 text-[#F5F2E8]" />
-              </div>
+            <div className="flex justify-center mt30 mb132">
+              <img
+                src="/icons.svg"
+                alt="Chitragupta AI logo"
+                className="w-24 h-24 sm:w-28 sm:h-28 object-contain block"
+              />
             </div>
             <h1 className="text-2xl font-bold text-[#1A1A18] mb-1">Welcome back</h1>
             <p className="text-[#4A4845] text-sm">Sign in to Chitragupta AI</p>
