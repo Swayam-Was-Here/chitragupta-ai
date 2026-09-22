@@ -439,12 +439,15 @@ def upload_csv():
                 prediction = response.json()
 
 
-                risk_score = float(
+                raw_score = float(
                     prediction.get(
                         "risk_score",
                         0
-                    )
+                    ) or 0
                 )
+
+                # Rescale ML API risk score from [-20, 20] to [0, 100] for display
+                risk_score = max(0.0, min(100.0, (raw_score + 20.0) * 2.5))
 
 
                 is_anomaly = bool(
